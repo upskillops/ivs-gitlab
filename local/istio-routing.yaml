@@ -1,0 +1,49 @@
+# Routes GitLab through the cluster's existing Istio ingress gateway (192.168.0.140)
+# using the wildcard-upskillops-in-tls cert in istio-system.
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: gitlab-ivs-gateway
+  namespace: gitlab-ivs
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port: { number: 80, name: http, protocol: HTTP }
+      hosts: [gitlab-ivs.upskillops.in, registry-ivs.upskillops.in]
+      tls: { httpsRedirect: true }
+    - port: { number: 443, name: https, protocol: HTTPS }
+      hosts: [gitlab-ivs.upskillops.in, registry-ivs.upskillops.in]
+      tls:
+        mode: SIMPLE
+        credentialName: wildcard-upskillops-in-tls
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: gitlab-ivs-web
+  namespace: gitlab-ivs
+spec:
+  gateways: [gitlab-ivs-gateway]
+  hosts: [gitlab-ivs.upskillops.in]
+  http:
+    - route:
+        - destination:
+            host: gitlab-webservice-default.gitlab-ivs.svc.cluster.local
+            port: { number: 8181 }
+      timeout: 1800s
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: gitlab-ivs-registry
+  namespace: gitlab-ivs
+spec:
+  gateways: [gitlab-ivs-gateway]
+  hosts: [registry-ivs.upskillops.in]
+  http:
+    - route:
+        - destination:
+            host: gitlab-registry.gitlab-ivs.svc.cluster.local
+            port: { number: 5000 }
+      timeout: 1800s

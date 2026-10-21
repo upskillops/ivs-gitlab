@@ -1,0 +1,28 @@
+{{- if .Values.duoWorkflow.enabled -}}
+{{-   if eq "true" (include "gitlab.gatewayApi.route.enabled" .) -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: {{ template "ai-gateway.fullname" . }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "gitlab.standardLabels" $ | nindent 4 }}
+    {{- include "ai-gateway.labels" . | nindent 4 }}
+  annotations:
+    {{ .Values.gatewayRoute.annotations | toYaml | nindent 4 }}
+spec:
+  hostnames:
+    - {{ include "gitlab.ai-gateway.grpcHostname" . | quote }}
+  parentRefs:
+    {{- $ref := (include "gitlab.gatewayApi.gatewayRef" . | fromYamlArray) }}
+    {{- $_ := set ($ref | first) "sectionName" .Values.gatewayRoute.grpc.sectionName }}
+    {{- $ref | toYaml | nindent 4 }}
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: {{ template "ai-gateway.fullname" . }}
+          port: 50052
+          weight: 1
+{{-   end }}
+{{- end }}

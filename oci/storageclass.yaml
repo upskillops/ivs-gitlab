@@ -1,0 +1,13 @@
+# OKE worker nodes here have in-transit encryption enabled (node pool is_pv_encryption_in_transit_enabled),
+# which only works with paravirtualized attachments. The default oci-bv class attaches via iSCSI and fails with:
+#   "node ... has in transit encryption enabled, but attachment type is not paravirtualized"
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: oci-bv-pv
+provisioner: blockvolume.csi.oraclecloud.com
+parameters:
+  attachment-type: "paravirtualized"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true

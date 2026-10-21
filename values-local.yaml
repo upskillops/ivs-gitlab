@@ -1,0 +1,68 @@
+# Overrides for the local kubeadm cluster (upskillops): Longhorn storage, Istio ingress,
+# single replicas and small requests. Use with: -f values.yaml -f values-local.yaml
+
+global:
+  hosts:
+    domain: upskillops.in
+    gitlab:
+      name: gitlab-ivs.upskillops.in
+    registry:
+      name: registry-ivs.upskillops.in
+
+  # TLS is terminated by the existing Istio ingress gateway (wildcard cert), see local/istio-routing.yaml
+  gatewayApi:
+    enabled: false
+    installEnvoy: false
+    configureCertmanager: false
+
+  kas:
+    enabled: false
+
+installCertmanager: false   # cert-manager already runs in this cluster
+
+gitlab:
+  gitaly:
+    persistence:
+      storageClass: longhorn-gitlab
+      size: 20Gi
+    resources:
+      requests: { cpu: 100m, memory: 300Mi }
+
+  # Rails boots slowly on this busy cluster; give Puma/Sidekiq time to start
+  # before liveness probes restart them.
+  webservice:
+    deployment:
+      livenessProbe:
+        initialDelaySeconds: 300
+    minReplicas: 1
+    maxReplicas: 1
+    workerProcesses: 2
+    resources:
+      requests: { cpu: 300m, memory: 1.5G }
+    workhorse:
+      resources:
+        requests: { cpu: 50m, memory: 50M }
+
+  sidekiq:
+    livenessProbe:
+      initialDelaySeconds: 300
+    minReplicas: 1
+    maxReplicas: 1
+    resources:
+      requests: { cpu: 200m, memory: 700M }
+
+  gitlab-shell:
+    minReplicas: 1
+    maxReplicas: 1
+
+  toolbox:
+    resources:
+      requests: { cpu: 50m, memory: 300M }
+
+  gitlab-exporter:
+    enabled: false
+
+registry:
+  hpa:
+    minReplicas: 1
+    maxReplicas: 1

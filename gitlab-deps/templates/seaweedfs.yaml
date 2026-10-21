@@ -1,0 +1,94 @@
+{{- if eq .Values.objectStore "seaweedfs" }}
+# Single-node SeaweedFS (master + volume + filer + S3 gateway in one container).
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-s3
+spec:
+  selector: { app: gitlab-s3 }
+  ports: [{ name: s3, port: 8333 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gitlab-s3
+spec:
+  serviceName: gitlab-s3
+  replicas: 1
+  selector:
+    matchLabels: { app: gitlab-s3 }
+  template:
+    metadata:
+      labels: { app: gitlab-s3 }
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: seaweedfs
+          image: {{ .Values.seaweedfs.image }}
+          args:
+            - server
+            - -dir=/data
+            - -ip.bind=0.0.0.0
+            - -volume.max=0                      # size the volume count from free disk
+            - -master.volumeSizeLimitMB=1024     # many small volumes instead of a few 30 GB ones
+            - -s3
+            - -s3.port=8333
+            - -s3.config=/etc/seaweedfs/s3.json
+          env:
+            # One volume per bucket on first write (default is 7), so 11 buckets fit a small disk.
+            - { name: WEED_MASTER_VOLUME_GROWTH_COPY_1, value: "1" }
+          ports: [{ name: s3, containerPort: 8333 }]
+          readinessProbe:
+            tcpSocket: { port: 8333 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8333 }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources: {{- toYaml .Values.seaweedfs.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: config, mountPath: /etc/seaweedfs, readOnly: true }
+      volumes:
+        - name: config
+          secret: { secretName: gitlab-s3-config }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- include "deps.storageClass" . | nindent 8 }}
+        resources: { requests: { storage: {{ .Values.seaweedfs.size }} } }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gitlab-s3-buckets
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: aws
+          image: {{ .Values.seaweedfs.bucketJobImage }}
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: { secretKeyRef: { name: gitlab-minio-root, key: user } }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: gitlab-minio-root, key: password } }
+            - { name: AWS_DEFAULT_REGION, value: {{ .Values.s3Region | quote }} }
+          command:
+            - sh
+            - -ec
+            - |
+              S3="aws --endpoint-url http://gitlab-s3:8333 s3api"
+              until $S3 list-buckets >/dev/null; do sleep 5; done
+              {{- range .Values.buckets }}
+              $S3 head-bucket --bucket {{ . }} 2>/dev/null || $S3 create-bucket --bucket {{ . }}
+              {{- end }}
+              $S3 list-buckets --query 'Buckets[].Name' --output text
+{{- end }}

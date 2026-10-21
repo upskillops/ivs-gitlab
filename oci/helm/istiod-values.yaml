@@ -1,0 +1,8 @@
+# istiod (chart istio/istiod 1.31.2): let class "istio" Ingress resources (cert-manager HTTP-01
+# challenges) be served by the istio-ingress gateway, whose pods are labelled istio=ingress.
+#   helm upgrade istiod istio/istiod -n istio-system --version 1.31.2 -f oci/helm/istiod-values.yaml
+meshConfig:
+  ingressClass: istio
+  ingressControllerMode: STRICT
+  ingressSelector: ingress
+  ingressService: istio-ingress

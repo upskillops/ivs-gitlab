@@ -1,0 +1,119 @@
+# GitLab chart 10.5.0 (GitLab v19.5.0) — shared base values (defaults: Amazon EKS, gp3 StorageClass).
+# Cloud-specific overrides: values-eks.yaml, values-oci.yaml, values-local.yaml.
+#
+# Since chart v10.0.0 PostgreSQL, Redis and object storage are NOT bundled. This file expects
+# the in-namespace services/secrets created by ../gitlab-deps (PostgreSQL, Valkey, MinIO).
+# To use RDS / ElastiCache / S3 instead, change the hosts below and recreate the
+# gitlab-object-storage / gitlab-registry-storage secrets in S3 format (see README.md).
+#
+# Other clusters: layer an override file on top, e.g. `-f values.yaml -f values-local.yaml`.
+
+global:
+  edition: ee   # runs as Free tier without a license; set to "ce" for Community Edition
+
+  hosts:
+    domain: example.com          # <-- CHANGE: gitlab.<domain>, registry.<domain>, kas.<domain>
+    https: true
+
+  ## Ingress: chart 10.x uses Gateway API with a bundled Envoy Gateway.
+  ## Envoy Gateway's Service becomes an AWS NLB (needs AWS Load Balancer Controller).
+  gatewayApi:
+    enabled: true
+    installEnvoy: true
+    configureCertmanager: true   # Let's Encrypt HTTP-01 issuer for the Gateway
+    httpToHttpsRedirect: true
+
+  ingress:
+    enabled: false
+
+  ## External PostgreSQL (gitlab-deps)
+  psql:
+    host: gitlab-postgresql
+    port: 5432
+    database: gitlabhq_production
+    username: gitlab
+    password:
+      secret: gitlab-postgresql-password
+      key: password
+
+  ## External Redis / Valkey (gitlab-deps)
+  redis:
+    host: gitlab-redis
+    port: 6379
+    auth:
+      enabled: true
+      secret: gitlab-redis-password
+      key: password
+
+  ## Consolidated object storage (MinIO from gitlab-deps, or S3)
+  appConfig:
+    object_store:
+      enabled: true
+      proxy_download: true
+      connection:
+        secret: gitlab-object-storage
+        key: connection
+    lfs:
+      bucket: git-lfs
+    artifacts:
+      bucket: gitlab-artifacts
+    uploads:
+      bucket: gitlab-uploads
+    packages:
+      bucket: gitlab-packages
+    externalDiffs:
+      enabled: true
+      bucket: gitlab-mr-diffs
+    terraformState:
+      enabled: true
+      bucket: gitlab-terraform-state
+    ciSecureFiles:
+      enabled: true
+      bucket: gitlab-ci-secure-files
+    dependencyProxy:
+      enabled: true
+      bucket: gitlab-dependency-proxy
+    backups:
+      bucket: gitlab-backups
+      tmpBucket: tmp
+
+## cert-manager: the chart installs it. Set false if the cluster already runs cert-manager.
+installCertmanager: true
+certmanager-issuer:
+  email: admin@example.com       # <-- CHANGE: Let's Encrypt account email
+
+## Envoy Gateway Service type; cloud-specific load balancer annotations live in values-<cloud>.yaml.
+gatewayApiResources:
+  envoy:
+    proxySpec:
+      provider:
+        type: Kubernetes
+        kubernetes:
+          envoyService:
+            type: LoadBalancer
+
+## Not needed for a basic install; use your existing monitoring / runners.
+prometheus:
+  install: false
+gitlab-runner:
+  install: false
+
+registry:
+  enabled: true
+  storage:
+    secret: gitlab-registry-storage
+    key: config
+
+gitlab:
+  gitaly:
+    persistence:
+      enabled: true
+      storageClass: gp3
+      size: 50Gi
+
+  toolbox:
+    backups:
+      objectStorage:
+        config:
+          secret: gitlab-backup-storage
+          key: config

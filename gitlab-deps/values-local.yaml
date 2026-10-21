@@ -1,0 +1,8 @@
+storageClass: longhorn-gitlab
+postgresql:
+  size: 10Gi
+minio:
+  size: 20Gi
+
+# Keep the existing MinIO install on the local cluster (image cached there).
+objectStore: minio

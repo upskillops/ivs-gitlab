@@ -1,0 +1,85 @@
+{{- if eq .Values.objectStore "minio" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-minio
+spec:
+  selector: { app: gitlab-minio }
+  ports:
+    - { name: s3, port: 9000 }
+    - { name: console, port: 9001 }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gitlab-minio
+spec:
+  serviceName: gitlab-minio
+  replicas: 1
+  selector:
+    matchLabels: { app: gitlab-minio }
+  template:
+    metadata:
+      labels: { app: gitlab-minio }
+    spec:
+      securityContext: { fsGroup: 1000, runAsUser: 1000, runAsGroup: 1000 }
+      containers:
+        - name: minio
+          image: {{ .Values.minio.image }}
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom: { secretKeyRef: { name: gitlab-minio-root, key: user } }
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: gitlab-minio-root, key: password } }
+            - { name: MINIO_REGION, value: {{ .Values.s3Region | quote }} }
+          ports:
+            - { name: s3, containerPort: 9000 }
+            - { name: console, containerPort: 9001 }
+          readinessProbe:
+            httpGet: { path: /minio/health/ready, port: 9000 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /minio/health/live, port: 9000 }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources: {{- toYaml .Values.minio.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /data }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- include "deps.storageClass" . | nindent 8 }}
+        resources: { requests: { storage: {{ .Values.minio.size }} } }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gitlab-minio-buckets
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: {{ .Values.minio.image }}
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom: { secretKeyRef: { name: gitlab-minio-root, key: user } }
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: gitlab-minio-root, key: password } }
+            - { name: HOME, value: /tmp }
+          command:
+            - sh
+            - -ec
+            - |
+              until mc alias set gl http://gitlab-minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do sleep 5; done
+              {{- range .Values.buckets }}
+              mc mb --ignore-existing gl/{{ . }}
+              {{- end }}
+{{- end }}

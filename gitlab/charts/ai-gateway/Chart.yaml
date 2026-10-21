@@ -1,0 +1,11 @@
+apiVersion: v2
+appVersion: self-hosted-v19.4.1-ee
+dependencies:
+- condition: grpc-tls-proxy.enabled
+  name: grpc-tls-proxy
+  repository: file://charts/grpc-tls-proxy
+  version: 0.1.1
+description: A Helm chart for Kubernetes
+name: ai-gateway
+type: application
+version: 0.15.3

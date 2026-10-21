@@ -1,0 +1,17 @@
+# Never commit credentials
+keys/
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*.kubeconfig
+kubeconfig*
+.env
+*.env
+access
+*-credentials*
+
+# Local / generated
+.DS_Store
+*.log
+*.tgz

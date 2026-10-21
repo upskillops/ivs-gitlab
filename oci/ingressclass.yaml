@@ -1,0 +1,7 @@
+# IngressClass for Istio's Kubernetes Ingress support (used by cert-manager HTTP-01 challenges).
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: istio
+spec:
+  controller: istio.io/ingress-controller

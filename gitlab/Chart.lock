@@ -1,0 +1,45 @@
+dependencies:
+- name: gitlab
+  repository: ""
+  version: '*.*.*'
+- name: certmanager-issuer
+  repository: ""
+  version: '*.*.*'
+- name: registry
+  repository: ""
+  version: '*.*.*'
+- name: cert-manager
+  repository: oci://quay.io/jetstack/charts
+  version: v1.21.2
+- name: prometheus
+  repository: oci://ghcr.io/prometheus-community/charts
+  version: 29.31.1
+- name: gitlab-runner
+  repository: oci://registry.gitlab.com/charts/charts.gitlab.io/release
+  version: 0.93.0
+- name: nginx-ingress
+  repository: ""
+  version: '*.*.*'
+- name: nginx-ingress
+  repository: ""
+  version: '*.*.*'
+- name: gitlab-zoekt
+  repository: https://charts.gitlab.io/
+  version: 4.1.0
+- name: openbao
+  repository: oci://registry.gitlab.com/charts/charts.gitlab.io/release
+  version: 0.20.0
+- name: traefik
+  repository: https://helm.traefik.io/traefik
+  version: 10.19.4
+- name: kubernetes-ingress
+  repository: https://haproxytech.github.io/helm-charts
+  version: 1.39.4
+- name: gateway-helm
+  repository: oci://registry-1.docker.io/envoyproxy
+  version: 1.9.2
+- name: ai-gateway
+  repository: https://gitlab.com/api/v4/projects/gitlab-org%2fcharts%2fai-gateway-helm-chart/packages/helm/devel
+  version: 0.15.3
+digest: sha256:0ec370c5a4114a7eb23f2d290707164961708bc1bfb79926c3f5439e8a7f73e2
+generated: "2026-10-09T13:57:42.935966+02:00"

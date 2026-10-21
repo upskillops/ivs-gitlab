@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-postgresql
+spec:
+  selector: { app: gitlab-postgresql }
+  ports: [{ name: postgres, port: 5432 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gitlab-postgresql
+spec:
+  serviceName: gitlab-postgresql
+  replicas: 1
+  selector:
+    matchLabels: { app: gitlab-postgresql }
+  template:
+    metadata:
+      labels: { app: gitlab-postgresql }
+    spec:
+      securityContext: { fsGroup: 70 }
+      containers:
+        - name: postgresql
+          image: {{ .Values.postgresql.image }}
+          env:
+            - { name: POSTGRES_DB, value: {{ .Values.postgresql.database | quote }} }
+            - { name: POSTGRES_USER, value: {{ .Values.postgresql.username | quote }} }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: gitlab-postgresql-password, key: password } }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          args: ["-c", "max_connections=300", "-c", "shared_buffers=256MB"]
+          ports: [{ name: postgres, containerPort: 5432 }]
+          # Generous timeouts: on small, CPU-saturated nodes (e.g. during a GitLab rollout) a 1s
+          # exec probe times out and the liveness probe would restart a healthy database.
+          readinessProbe:
+            exec: { command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"] }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec: { command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"] }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 6
+          resources: {{- toYaml .Values.postgresql.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- include "deps.storageClass" . | nindent 8 }}
+        resources: { requests: { storage: {{ .Values.postgresql.size }} } }

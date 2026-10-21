@@ -1,0 +1,64 @@
+# GitLab UI, registry and Git SSH through the Istio ingress gateway (LB 137.23.58.128).
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: gitlab-gateway
+  namespace: istio-ingress
+spec:
+  selector:
+    istio: ingress
+  servers:
+    # No port-80 server for these hosts: port 80 serves Let's Encrypt HTTP-01 challenges.
+    - port: { number: 443, name: https-gitlab, protocol: HTTPS }
+      hosts: [gitlab.137.23.58.128.nip.io, registry.137.23.58.128.nip.io]
+      tls:
+        mode: SIMPLE
+        credentialName: gitlab-tls
+    - port: { number: 22, name: tcp-gitlab-ssh, protocol: TCP }
+      hosts: ["*"]
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: gitlab-web
+  namespace: gitlab-ivs
+spec:
+  gateways: [istio-ingress/gitlab-gateway]
+  hosts: [gitlab.137.23.58.128.nip.io]
+  http:
+    - route:
+        - destination:
+            host: gitlab-webservice-default.gitlab-ivs.svc.cluster.local
+            port: { number: 8181 }
+      timeout: 1800s
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: gitlab-registry
+  namespace: gitlab-ivs
+spec:
+  gateways: [istio-ingress/gitlab-gateway]
+  hosts: [registry.137.23.58.128.nip.io]
+  http:
+    - route:
+        - destination:
+            host: gitlab-registry.gitlab-ivs.svc.cluster.local
+            port: { number: 5000 }
+      timeout: 1800s
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: gitlab-ssh
+  namespace: gitlab-ivs
+spec:
+  gateways: [istio-ingress/gitlab-gateway]
+  hosts: ["*"]
+  tcp:
+    - match:
+        - port: 22
+      route:
+        - destination:
+            host: gitlab-gitlab-shell.gitlab-ivs.svc.cluster.local
+            port: { number: 22 }

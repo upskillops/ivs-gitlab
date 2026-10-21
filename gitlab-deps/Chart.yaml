@@ -1,0 +1,7 @@
+apiVersion: v2
+name: gitlab-deps
+description: >-
+  PostgreSQL, Valkey (Redis) and MinIO (S3) for the GitLab chart >= 10.0, which no longer
+  bundles them. Intended for dev/test/small installs; use RDS / ElastiCache / S3 in production.
+type: application
+version: 0.1.0

@@ -1,0 +1,63 @@
+# Storage class for all PVCs. "" = cluster default.
+storageClass: gp3
+
+postgresql:
+  image: docker.io/library/postgres:17-alpine
+  database: gitlabhq_production
+  username: gitlab
+  size: 20Gi
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 2Gi }
+
+valkey:
+  image: docker.io/valkey/valkey:8.1-alpine
+  size: 5Gi
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { memory: 1Gi }
+
+# S3-compatible object store: "seaweedfs" (default), "minio", or "external" (cloud object storage).
+# MinIO no longer publishes free images (quay.io / Docker Hub return 401); "minio" only works
+# where the image is already cached, e.g. the local cluster.
+objectStore: seaweedfs
+s3Region: us-east-1
+registryBucket: gitlab-registry
+
+# objectStore: external — e.g. OCI Object Storage S3 API or another S3 endpoint (no in-cluster store).
+# Pass the keys at deploy time (deploy.sh: S3_ACCESS_KEY / S3_SECRET_KEY), never in a values file.
+external:
+  endpoint: ""                 # https://<namespace>.compat.objectstorage.<region>.oraclecloud.com
+  accessKey: ""
+  secretKey: ""
+  # OCI's S3 API does not support streaming (chunked) SigV4 uploads.
+  disableStreamingSignature: true
+
+seaweedfs:
+  image: docker.io/chrislusf/seaweedfs:4.48
+  size: 50Gi
+  bucketJobImage: docker.io/amazon/aws-cli:latest
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 1Gi }
+
+minio:
+  image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
+  size: 50Gi
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 1Gi }
+
+# Buckets created in the object store (names match values.yaml in the GitLab chart).
+buckets:
+  - gitlab-registry
+  - git-lfs
+  - gitlab-artifacts
+  - gitlab-uploads
+  - gitlab-packages
+  - gitlab-mr-diffs
+  - gitlab-terraform-state
+  - gitlab-ci-secure-files
+  - gitlab-dependency-proxy
+  - gitlab-backups
+  - tmp

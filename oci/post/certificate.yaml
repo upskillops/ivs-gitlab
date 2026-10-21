@@ -1,0 +1,31 @@
+# Let's Encrypt certificate for the Istio gateway (secret must live in the gateway's namespace).
+# HTTP-01 challenges are served by the Istio gateway via a class "istio" Ingress, which needs
+# istiod meshConfig.ingressSelector=ingress (the gateway pods are labelled istio=ingress).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-istio
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: amit.chaturvedi@wibmo.com
+    privateKeySecretRef:
+      name: letsencrypt-istio-account
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: istio
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gitlab-tls
+  namespace: istio-ingress
+spec:
+  secretName: gitlab-tls
+  issuerRef:
+    name: letsencrypt-istio
+    kind: ClusterIssuer
+  dnsNames:
+    - gitlab.137.23.58.128.nip.io
+    - registry.137.23.58.128.nip.io

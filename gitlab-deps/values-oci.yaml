@@ -1,0 +1,14 @@
+storageClass: oci-bv-pv
+# OCI block volumes are at least 50 GB
+postgresql:
+  size: 50Gi
+valkey:
+  size: 50Gi
+
+# OCI Object Storage via its S3-compatible API (buckets + key from the oke-private Terraform).
+# Keys come from deploy.sh: S3_ACCESS_KEY / S3_SECRET_KEY.
+objectStore: external
+s3Region: ap-mumbai-1
+registryBucket: uat-gitlab-registry
+external:
+  endpoint: https://bmyqoif8kbjq.compat.objectstorage.ap-mumbai-1.oraclecloud.com

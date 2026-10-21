@@ -1,0 +1,85 @@
+# Overrides for OCI OKE (wibmooci / uat). Use with: -f values.yaml -f values-oci.yaml
+# Same chart and dependencies as EKS; on OCI GitLab is exposed through the cluster's Istio
+# ingress gateway (oci/post/) instead of the chart's bundled Envoy Gateway.
+
+global:
+  hosts:
+    # nip.io resolves <anything>.137.23.58.128.nip.io to the Istio gateway's reserved LB IP
+    domain: 137.23.58.128.nip.io
+
+  # Exposed through the cluster's Istio ingress gateway (oci/post/), not the bundled Envoy Gateway.
+  gatewayApi:
+    enabled: false
+    installEnvoy: false
+    configureCertmanager: false
+  kas:
+    enabled: false
+
+  ## OCI Object Storage buckets (namespace-unique names, created by oke-private: gitlab_buckets)
+  appConfig:
+    lfs: { bucket: uat-gitlab-lfs }
+    artifacts: { bucket: uat-gitlab-artifacts }
+    uploads: { bucket: uat-gitlab-uploads }
+    packages: { bucket: uat-gitlab-packages }
+    externalDiffs: { bucket: uat-gitlab-mr-diffs }
+    terraformState: { bucket: uat-gitlab-terraform-state }
+    ciSecureFiles: { bucket: uat-gitlab-ci-secure-files }
+    dependencyProxy: { bucket: uat-gitlab-dependency-proxy }
+    backups:
+      bucket: uat-gitlab-backups
+      tmpBucket: uat-gitlab-tmp
+
+installCertmanager: true   # cert-manager also issues the Istio gateway certificate (oci/post/)
+
+## Small footprint: 3 nodes x (1 OCPU / 8 GB)
+gitlab:
+  gitaly:
+    persistence:
+      storageClass: oci-bv-pv
+      size: 50Gi   # OCI block volume minimum
+    resources:
+      requests: { cpu: 100m, memory: 300Mi }
+
+  # Small nodes: never run old + new Rails pods side by side during upgrades (that saturated a
+  # node and took PostgreSQL down), and give Puma / Sidekiq time to boot before liveness checks.
+  webservice:
+    deployment:
+      strategy:
+        rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }
+      livenessProbe:
+        initialDelaySeconds: 300
+    minReplicas: 1
+    maxReplicas: 2
+    workerProcesses: 2
+    resources:
+      requests: { cpu: 300m, memory: 1.5G }
+    workhorse:
+      resources:
+        requests: { cpu: 50m, memory: 50M }
+
+  sidekiq:
+    deployment:
+      strategy:
+        rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }
+    livenessProbe:
+      initialDelaySeconds: 300
+    minReplicas: 1
+    maxReplicas: 1
+    resources:
+      requests: { cpu: 200m, memory: 700M }
+
+  gitlab-shell:
+    minReplicas: 1
+    maxReplicas: 2
+
+  toolbox:
+    resources:
+      requests: { cpu: 50m, memory: 300M }
+
+  gitlab-exporter:
+    enabled: false
+
+registry:
+  hpa:
+    minReplicas: 1
+    maxReplicas: 2
